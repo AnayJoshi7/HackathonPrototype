@@ -1,18 +1,32 @@
 import React from 'react'
 import { createRoot } from 'react-dom/client'
-import { MapContainer, TileLayer, GeoJSON, Polyline, useMapEvents } from 'react-leaflet'
+import { GeoJSON, MapContainer, Polyline, TileLayer, useMapEvents } from 'react-leaflet'
+import { ArrowUpRight, BadgeCheck, Database, FileCheck2, Layers3, Route, ShieldCheck, Sparkles, WalletCards } from 'lucide-react'
 import 'leaflet/dist/leaflet.css'
 import './styles.css'
-import { Activity, ArrowUpRight, BadgeCheck, CircleDollarSign, ClipboardCheck, Crosshair, Database, FileCheck2, Landmark, Layers3, LockKeyhole, MapPinned, MousePointer2, Radio, Route, ShieldCheck, Sparkles, WalletCards } from 'lucide-react'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-const fallbackParcels = Array.from({ length: 18 }, (_, i) => {
-  const x = i % 6, y = Math.floor(i / 6), west = 73.78 + x * .0022, south = 18.52 + y * .0022
-  return { id: i + 1, khasra_no: `KSR-${1041 + i}`, owner_name: ['Asha Patil', 'Ramesh Jadhav', 'Meena Shinde', 'Sanjay More', 'Kavita Pawar'][i % 5], land_type: ['Agricultural', 'Residential', 'Orchard', 'Barren'][i % 4], circle_rate: 1650 + i % 4 * 325, area_sq_m: 49200, geometry: { type: 'Polygon', coordinates: [[[west, south], [west + .002, south], [west + .002, south + .002], [west, south + .002], [west, south]]] } }
+const owners = ['Asha Patil', 'Ramesh Jadhav', 'Meena Shinde', 'Sanjay More', 'Kavita Pawar']
+const landTypes = ['Agricultural', 'Residential', 'Orchard', 'Barren']
+const fallbackParcels = Array.from({ length: 18 }, (_, index) => {
+  const column = index % 6
+  const row = Math.floor(index / 6)
+  const west = 73.78 + column * 0.0022
+  const south = 18.52 + row * 0.0022
+  return {
+    id: index + 1,
+    khasra_no: `KSR-${1041 + index}`,
+    owner_name: owners[index % owners.length],
+    land_type: landTypes[index % landTypes.length],
+    circle_rate: 1650 + (index % 4) * 325,
+    area_sq_m: 49200,
+    district: 'Pune',
+    geometry: { type: 'Polygon', coordinates: [[[west, south], [west + 0.002, south], [west + 0.002, south + 0.002], [west, south + 0.002], [west, south]]] }
+  }
 })
 
 function MapClick({ onPoint }) {
-  useMapEvents({ click: e => onPoint([e.latlng.lng, e.latlng.lat]) })
+  useMapEvents({ click: event => onPoint([event.latlng.lng, event.latlng.lat]) })
   return null
 }
 
@@ -22,27 +36,64 @@ function App() {
   const [corridor, setCorridor] = React.useState([])
   const [affected, setAffected] = React.useState([])
   const [status, setStatus] = React.useState('LIVE DEMO DATA')
-  React.useEffect(() => { fetch(`${API}/api/gis/parcels`).then(r => r.ok ? r.json() : Promise.reject()).then(setParcels).catch(() => {}) }, [])
+
+  React.useEffect(() => {
+    fetch(`${API}/api/gis/parcels`).then(response => response.ok ? response.json() : Promise.reject()).then(setParcels).catch(() => {})
+  }, [])
 
   const runAnalysis = async () => {
     if (corridor.length < 2) return
     setStatus('ANALYZING CORRIDOR')
     try {
       const response = await fetch(`${API}/api/gis/corridor`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ coordinates: corridor, width_m: 30 }) })
-      const data = await response.json(); setAffected(data.affected_parcels || [])
+      const data = await response.json()
+      setAffected(data.affected_parcels || [])
       setStatus(`${data.affected_parcels?.length || 0} PARCELS AFFECTED`)
-    } catch { setAffected(parcels.filter((_, i) => i % 3 === 0).map(p => ({ ...p, affected_area_sq_m: 1180, estimated_compensation: p.circle_rate * 1180 * 4 }))); setStatus('DEMO ANALYSIS COMPLETE') }
+    } catch {
+      setAffected(parcels.filter((_, index) => index % 3 === 0).map(parcel => ({ ...parcel, affected_area_sq_m: 1180, estimated_compensation: parcel.circle_rate * 1180 * 4 })))
+      setStatus('DEMO ANALYSIS COMPLETE')
+    }
   }
-  const total = affected.reduce((sum, item) => sum + (item.estimated_compensation || 0), 0)
 
-  return <main>
-    <header className="topbar"><div className="brand"><div className="brand-mark"><Landmark size={19} /></div><div><strong>N-LAMS</strong><span>National Land Acquisition & Management System</span></div></div><div className="top-actions"><span className="live"><i /> SYSTEM OPERATIONAL</span><button className="icon-button" title="Notifications"><Activity size={17} /></button><div className="avatar">AM</div></div></header>
-    <section className="workspace-head"><div><div className="eyebrow">PROJECT / NH-48 EXPANSION <span>●</span> PILOT ZONE 04</div><h1>Corridor impact command</h1><p>Survey, value and monitor land acquisition from one verified workspace.</p></div><div className="head-meta"><div><small>PROJECTED ACQUISITION</small><strong>{affected.length || 18} <em>parcels</em></strong></div><div><small>EST. LIABILITY</small><strong>₹{(total || 4.82e7).toLocaleString('en-IN')}</strong></div><button className="primary" onClick={runAnalysis}><Sparkles size={16} /> RUN ANALYSIS</button></div></section>
-    <nav className="tabs"><span className="active"><MapPinned size={15} /> LAND ACQUISITION</span><span><ClipboardCheck size={15} /> COMPLIANCE</span><span><Radio size={15} /> MONITORING <b>NEW</b></span><span className="tab-spacer" /><span className="audit"><LockKeyhole size={14} /> AUDIT LEDGER <ArrowUpRight size={14} /></span></nav>
-    <section className="main-grid"><div className="map-panel"><div className="map-toolbar"><div className="tool-active"><MousePointer2 size={15} /> SELECT</div><div onClick={() => setCorridor(c => [...c, [73.779, 18.519]])}><Route size={15} /> DRAW CORRIDOR</div><div><Layers3 size={15} /> LAYERS <span className="chevron">⌄</span></div></div><MapContainer center={[18.523, 73.785]} zoom={14} zoomControl={false} className="map"><TileLayer attribution="Tiles © Esri" url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" /><MapClick onPoint={point => setCorridor(c => [...c, point])} />{parcels.map(parcel => <GeoJSON key={parcel.id} data={parcel.geometry} eventHandlers={{ click: () => setSelected(parcel) }} pathOptions={{ color: selected?.id === parcel.id ? '#f4bd4e' : '#90b8a5', weight: selected?.id === parcel.id ? 3 : 1, fillColor: affected.some(a => a.khasra_no === parcel.khasra_no) ? '#ef6f51' : '#8ab3a0', fillOpacity: selected?.id === parcel.id ? .5 : .2 }} />)}{corridor.length > 1 && <Polyline positions={corridor.map(([lng, lat]) => [lat, lng])} color="#f4bd4e" weight={5} dashArray="8 8" />}</MapContainer><div className="map-legend"><div><i className="parcel-key" /> Cadastral boundary</div><div><i className="corridor-key" /> Proposed alignment</div><div><i className="impact-key" /> Affected parcel</div></div><div className="map-status"><Crosshair size={14} /> {status}<span>18 / 18 synced</span></div></div>
-      <aside className="inspector"><div className="inspector-head"><div><span className="eyebrow">SELECTED PARCEL</span><h2>{selected?.khasra_no || 'No selection'}</h2></div><button className="icon-button"><ArrowUpRight size={17} /></button></div><div className="owner"><div className="owner-avatar">{selected?.owner_name.split(' ').map(v => v[0]).join('')}</div><div><strong>{selected?.owner_name}</strong><span>Verified landholder <BadgeCheck size={13} /></span></div><span className="verified">VERIFIED</span></div><div className="data-grid"><div><small>LAND TYPE</small><strong>{selected?.land_type}</strong></div><div><small>AREA</small><strong>{selected?.area_sq_m.toLocaleString('en-IN')} m²</strong></div><div><small>CIRCLE RATE</small><strong>₹{selected?.circle_rate.toLocaleString('en-IN')} / m²</strong></div><div><small>DISTRICT</small><strong>{selected?.district || 'Pune'}</strong></div></div><div className="inspector-section"><div className="section-label"><span>ACQUISITION ESTIMATE</span><span className="policy">RFCTLARR / 2013</span></div><div className="estimate"><CircleDollarSign size={23} /><div><small>CALCULATED COMPENSATION</small><strong>₹{((selected?.circle_rate || 0) * (selected?.area_sq_m || 0) * 4).toLocaleString('en-IN')}</strong></div></div><div className="formula"><span>Market value × rural multiplier</span><strong>2.0×</strong><span>Solatium</span><strong>100%</strong></div></div><div className="inspector-section integrations"><div className="section-label"><span>VERIFICATION SERVICES</span><span className="connected">● CONNECTED</span></div><div className="integration"><FileCheck2 size={16} /><span>e-Courts litigation check</span><b>Clear</b></div><div className="integration"><WalletCards size={16} /><span>DigiLocker KYC</span><b>Verified</b></div><div className="integration"><Database size={16} /><span>PFMS disbursement</span><b>Ready</b></div></div><button className="secondary"><ShieldCheck size={16} /> VIEW FULL PARCEL RECORD <ArrowUpRight size={14} /></button></aside></section>
-    <footer><span><ShieldCheck size={14} /> IMMUTABLE AUDIT TRAIL ACTIVE</span><span>LAST SYNC 09:42:18 IST</span><span>BUILD 0.1.0 / SIH 2026</span></footer>
-  </main>
+  const total = affected.reduce((sum, item) => sum + (item.estimated_compensation || 0), 0)
+  const initials = selected?.owner_name.split(' ').map(value => value[0]).join('')
+
+  return (
+    <main>
+      <header className="topbar">
+        <div className="brand"><strong>N-LAMS</strong><span>National Land Acquisition &amp; Management System</span></div>
+        <div className="top-actions"><span className="live"><i /> System Online</span><div className="avatar" aria-label="User profile">AM</div></div>
+      </header>
+
+      <section className="workspace-head">
+        <div><div className="eyebrow">Project / NH-48 Expansion</div><h1>Corridor impact command</h1><p>Survey, value and monitor land acquisition from one verified workspace.</p></div>
+        <div className="head-meta"><div className="metric"><small>Projected<br />Acquisition</small><strong>{affected.length || 18} parcels</strong></div><div className="metric"><small>Est. Liability</small><strong>₹{(total || 48200000).toLocaleString('en-IN')}</strong></div><button className="primary" onClick={runAnalysis} aria-label="Run analysis"><Sparkles size={28} /><span>Run Analysis</span></button></div>
+      </section>
+
+      <section className="main-grid">
+        <div className="map-panel">
+          <div className="map-toolbar"><div className="tool-active">⌁ Select</div><div onClick={() => setCorridor(points => [...points, [73.779, 18.519]])}><Route size={13} /> Draw Corridor</div><div><Layers3 size={13} /> Layers</div></div>
+          <MapContainer center={[18.523, 73.785]} zoom={14} zoomControl={false} className="map">
+            <TileLayer attribution="Tiles © Esri" url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" />
+            <MapClick onPoint={point => setCorridor(points => [...points, point])} />
+            {parcels.map(parcel => <GeoJSON key={parcel.id} data={parcel.geometry} eventHandlers={{ click: () => setSelected(parcel) }} pathOptions={{ color: selected?.id === parcel.id ? '#3DDC84' : '#FFFFFF', weight: selected?.id === parcel.id ? 3 : 1, fillColor: affected.some(item => item.khasra_no === parcel.khasra_no) ? '#3DDC84' : '#FFFFFF', fillOpacity: selected?.id === parcel.id ? 0.5 : 0.2 }} />)}
+            {corridor.length > 1 && <Polyline positions={corridor.map(([longitude, latitude]) => [latitude, longitude])} color="#3DDC84" weight={5} dashArray="8 8" />}
+          </MapContainer>
+          <div className="map-legend"><span><i className="legend-parcel" /> Cadastral boundary</span><span><i className="legend-corridor" /> Proposed alignment</span><span><i className="legend-affected" /> Affected parcel</span></div>
+          <div className="map-status">{status}<span>18 / 18 synced</span></div>
+        </div>
+
+        <aside className="inspector">
+          <div className="inspector-head"><div><h2>{selected?.khasra_no || 'No selection'}</h2></div><button className="icon-button"><ArrowUpRight size={15} /></button></div>
+          <div className="owner"><div className="owner-avatar">{initials}</div><div><strong>{selected?.owner_name}</strong><span>Verified landholder <BadgeCheck size={13} /></span></div><span className="verified">VERIFIED</span></div>
+          <div className="data-grid"><div><small>LAND TYPE</small><strong>{selected?.land_type}</strong></div><div><small>AREA</small><strong>{selected?.area_sq_m.toLocaleString('en-IN')} m²</strong></div><div><small>CIRCLE RATE</small><strong>₹{selected?.circle_rate.toLocaleString('en-IN')} / m²</strong></div><div><small>DISTRICT</small><strong>{selected?.district || 'Pune'}</strong></div></div>
+          <div className="inspector-section"><div className="section-label"><span>ACQUISITION ESTIMATE</span><span className="policy">RFCTLARR / 2013</span></div><div className="estimate"><small>CALCULATED COMPENSATION</small><strong>₹{((selected?.circle_rate || 0) * (selected?.area_sq_m || 0) * 4).toLocaleString('en-IN')}</strong></div><div className="formula"><span>Market value × rural multiplier</span><strong>2.0×</strong><span>Solatium</span><strong>100%</strong></div></div>
+          <div className="inspector-section integrations"><div className="section-label"><span>VERIFICATION SERVICES</span><span className="connected">● CONNECTED</span></div><div className="integration"><FileCheck2 size={16} /><span>e-Courts litigation check</span><b>Clear</b></div><div className="integration"><WalletCards size={16} /><span>DigiLocker KYC</span><b>Verified</b></div><div className="integration"><Database size={16} /><span>PFMS disbursement</span><b>Ready</b></div></div>
+          <button className="secondary"><ShieldCheck size={16} /> VIEW FULL PARCEL RECORD</button>
+        </aside>
+      </section>
+    </main>
+  )
 }
 
 createRoot(document.getElementById('root')).render(<App />)
