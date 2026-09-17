@@ -1,0 +1,26 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: nlams-postgis
+    environment:
+      POSTGRES_DB: nlams
+      POSTGRES_USER: nlams
+      POSTGRES_PASSWORD: nlams_dev
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build: ./backend
+    container_name: nlams-api
+    environment:
+      DATABASE_URL: postgresql+psycopg://nlams:nlams_dev@db:5432/nlams
+      CORS_ORIGINS: http://localhost:5173
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+
+volumes:
+  postgres_data:
