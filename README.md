@@ -101,6 +101,19 @@ sudo docker-compose down -v
 - `POST /api/compensation/calculate` applies the prototype RFCTLARR-style calculation.
 - `GET /api/compensation/integrations` returns simulated PFMS, e-Courts, and DigiLocker statuses.
 - `POST /api/monitor/change-detection` compares `before` and `after` images with OpenCV.
+- `POST /api/satellite/analyze` runs the prototype satellite-monitoring pipeline on local sample imagery and returns change likelihood and verification guidance.
 - `GET/POST /api/ledger/entries` reads and appends SHA-256 chained audit entries.
+
+## Satellite monitoring prototype
+
+This feature adds a lightweight monitoring workflow for demonstrating how a land-acquisition system can compare parcel imagery captured before and after an acquisition notification.
+
+- The frontend reuses the current parcel inspector and adds a satellite-monitoring section without redesigning the dashboard.
+- Sample imagery is stored under `frontend/public/assets/satellite/`.
+- The backend runs a deterministic OpenCV change-detection pipeline using image difference + blur + thresholding + morphology.
+- The system returns a prototype result such as a possible new structure, change percentage, confidence score, and a recommendation to request field verification.
+- It is intentionally a SIH demo and not a production satellite-data system.
+
+A real data-source integration can later swap the local images for Sentinel-2 or Bhuvan raster tiles without changing the monitoring workflow itself.
 
 The frontend uses Esri World Imagery tiles, Leaflet, Lucide icons, and a deterministic local fallback dataset so the map remains explorable while the API is starting.

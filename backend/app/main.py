@@ -6,7 +6,7 @@ from sqlalchemy import text
 
 from app.config import settings
 from app.db import Base, engine
-from app.routers import compensation, gis, ledger, monitor
+from app.routers import compensation, gis, ledger, monitor, satellite
 
 
 @asynccontextmanager
@@ -22,6 +22,7 @@ app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origin_list, allo
 app.include_router(gis.router)
 app.include_router(compensation.router)
 app.include_router(monitor.router)
+app.include_router(satellite.router)
 app.include_router(ledger.router)
 
 
