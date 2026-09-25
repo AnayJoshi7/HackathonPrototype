@@ -1,7 +1,8 @@
 import React from 'react'
 import { createRoot } from 'react-dom/client'
 import { GeoJSON, MapContainer, Polyline, TileLayer, useMapEvents } from 'react-leaflet'
-import { ArrowUpRight, BadgeCheck, Database, FileCheck2, Layers3, Route, ShieldCheck, Sparkles, WalletCards } from 'lucide-react'
+import { ArrowRight, ArrowUpRight, BadgeCheck, CheckCircle2, Database, Eye, EyeOff, FileCheck2, Layers3, LockKeyhole, Route, ShieldCheck, Sparkles, WalletCards } from 'lucide-react'
+import { authenticate, clearSession, getLandingPath, persistSession, readSession, setWorkspace, submitAccessRequest, validateAccessRequest } from './auth'
 import 'leaflet/dist/leaflet.css'
 import './styles.css'
 
@@ -68,7 +69,7 @@ function MapClick({ onPoint }) {
   return null
 }
 
-function App() {
+function Dashboard({ onLogout }) {
   const [parcels, setParcels] = React.useState(fallbackParcels)
   const [selected, setSelected] = React.useState(fallbackParcels[7])
   const [corridor, setCorridor] = React.useState([])
@@ -115,7 +116,7 @@ function App() {
     <main>
       <header className="topbar">
         <div className="brand"><strong>N-LAMS</strong><span>National Land Acquisition &amp; Management System</span></div>
-        <div className="top-actions"><span className="live"><i /> System Online</span><div className="avatar" aria-label="User profile">AM</div></div>
+        <div className="top-actions"><span className="live"><i /> System Online</span><button className="session-logout" onClick={onLogout}>Sign out</button><div className="avatar" aria-label="User profile">AM</div></div>
       </header>
 
       <section className="workspace-head">
@@ -178,6 +179,116 @@ function App() {
       </section>
     </main>
   )
+}
+
+function navigate(path) {
+  window.history.pushState({}, '', path)
+  window.dispatchEvent(new PopStateEvent('popstate'))
+}
+
+function AuthShell({ children, footer = true }) {
+  return <div className="auth-shell">
+    <header className="auth-header">
+      <button className="auth-brand" onClick={() => navigate('/')} aria-label="Go to N-LAMS welcome screen"><strong>N-LAMS</strong><span>National Land Acquisition &amp; Management System</span></button>
+      <div className="secure-connection"><i /> SECURE CONNECTION</div>
+    </header>
+    <main className="auth-main">{children}</main>
+    {footer && <footer className="auth-footer"><span>OFFICIAL USE ONLY • MINISTRY OF ROAD TRANSPORT &amp; HIGHWAYS • GOVT OF INDIA</span><div><span>Security Policy</span><span>System Support</span><span>Privacy Protocol</span></div></footer>}
+  </div>
+}
+
+function Welcome() {
+  return <AuthShell>
+    <section className="welcome-content">
+      <div className="welcome-intro"><h1>One workspace for every stage of land acquisition.</h1><p>Map affected land, review land history, manage acquisition workflows and monitor changes from a single workspace.</p></div>
+      <div className="capability-grid">
+        <div><strong>GIS Mapping</strong><span>Interactive parcel plotting along national corridors.</span></div>
+        <div><strong>Land Verification</strong><span>Owner authentication, e-Courts and KYC checks.</span></div>
+        <div><strong>Acquisition Management</strong><span>Automated RFCTLARR calculations and PFMS tracking.</span></div>
+        <div><strong>Satellite Monitoring</strong><span>Multi-spectral timeline tracking of structural changes.</span></div>
+      </div>
+      <div className="welcome-actions"><button className="auth-button compact" onClick={() => navigate('/login')}>Get Started <ArrowRight size={16} /></button><span><CheckCircle2 size={16} /> Secure Government Workspace</span></div>
+    </section>
+  </AuthShell>
+}
+
+function Login({ onAuthenticated }) {
+  const [credentials, setCredentials] = React.useState({ email: '', password: '' })
+  const [showPassword, setShowPassword] = React.useState(false)
+  const [status, setStatus] = React.useState({ error: '', loading: false })
+
+  const submit = async event => {
+    event.preventDefault()
+    setStatus({ error: '', loading: true })
+    try {
+      const user = await authenticate(credentials)
+      const error = onAuthenticated(user)
+      if (error) throw new Error(error)
+    } catch (error) {
+      setStatus({ error: error instanceof Error ? error.message : 'Authentication failed. Please try again.', loading: false })
+    } finally {
+      setStatus(current => current.loading ? { ...current, loading: false } : current)
+    }
+  }
+
+  return <AuthShell><section className="auth-card login-card"><div className="auth-card-header"><h1>Sign in to N-LAMS</h1><p><LockKeyhole size={16} /> Secure Government Workspace</p></div><form onSubmit={submit}>
+    <label>Official Email / User ID<input type="email" value={credentials.email} onChange={event => setCredentials({ ...credentials, email: event.target.value })} placeholder="e.g., s.more@nic.in" autoComplete="username" required /></label>
+    <label>Password<div className="password-input"><input type={showPassword ? 'text' : 'password'} value={credentials.password} onChange={event => setCredentials({ ...credentials, password: event.target.value })} placeholder="••••••••••••" autoComplete="current-password" required /><button type="button" onClick={() => setShowPassword(value => !value)} aria-label={showPassword ? 'Hide password' : 'Show password'}>{showPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button></div></label>
+    {status.error && <p className="form-error" role="alert">{status.error}</p>}
+    <button className="auth-button" type="submit" disabled={status.loading}>{status.loading ? 'Authenticating…' : 'Sign In →'}</button>
+    <div className="form-links"><button type="button" className="text-link" onClick={() => setStatus({ error: 'Password recovery is pending connection to the government identity provider.', loading: false })}>Forgot Password?</button><button type="button" className="text-link accent" onClick={() => navigate('/request-access')}>Request Access</button></div>
+  </form></section></AuthShell>
+}
+
+function RequestAccess() {
+  const [details, setDetails] = React.useState({ fullName: '', email: '', employeeId: '', department: '', designation: '', authority: '' })
+  const [status, setStatus] = React.useState({ error: '', success: '', loading: false })
+  const fields = [['fullName', 'Full Name', 'e.g., Sanjay More'], ['email', 'Official Email', 'e.g., s.more@nic.in'], ['employeeId', 'Employee / Officer ID', 'e.g., SG-1094-MO'], ['department', 'Department', 'e.g., Revenue Department'], ['designation', 'Designation', 'e.g., Revenue Officer'], ['authority', 'District / Authority', 'e.g., Pune / NHAI-MH']]
+  const submit = async event => {
+    event.preventDefault()
+    const error = validateAccessRequest(details)
+    if (error) return setStatus({ error, success: '', loading: false })
+    setStatus({ error: '', success: '', loading: true })
+    await submitAccessRequest(details)
+    setStatus({ error: '', success: 'Request submitted. An authorized administrator will review your official details.', loading: false })
+  }
+  return <AuthShell><section className="auth-card request-card"><div className="auth-card-header"><h1>Request Access</h1><p>Submit your official details to request workspace credentials. Access is restricted to verified government authorities and revenue officials.</p></div><form onSubmit={submit}><div className="request-grid">{fields.map(([name, label, placeholder]) => <label key={name}>{label}<input type={name === 'email' ? 'email' : 'text'} value={details[name]} onChange={event => setDetails({ ...details, [name]: event.target.value })} placeholder={placeholder} required /></label>)}</div>{status.error && <p className="form-error" role="alert">{status.error}</p>}{status.success && <p className="form-success" role="status">{status.success}</p>}<p className="access-note">Access is subject to authorization by the relevant administrator.</p><button className="auth-button compact" type="submit" disabled={status.loading}>{status.loading ? 'Submitting…' : 'Submit Access Request →'}</button></form></section></AuthShell>
+}
+
+function Workspace({ user, onSelected }) {
+  const [selected, setSelected] = React.useState(user.roles[0])
+  return <AuthShell footer={false}><section className="workspace-select"><div className="workspace-intro"><h1>Select your workspace</h1><p>Choose an authorized workspace to continue.</p></div><div className="role-grid">{user.roles.map(role => <button key={role.id} className={`role-card ${selected.id === role.id ? 'active' : ''}`} onClick={() => setSelected(role)}><strong>{role.label}</strong><span>{role.description}</span></button>)}</div><div className="workspace-action"><button className="auth-button compact" onClick={() => { setWorkspace(selected); onSelected() }}>Enter Workspace <ArrowRight size={16} /></button><ShieldCheck size={14} /></div></section></AuthShell>
+}
+
+function App() {
+  const [path, setPath] = React.useState(window.location.pathname)
+  const [session, setSession] = React.useState(readSession)
+  React.useEffect(() => { const update = () => setPath(window.location.pathname); window.addEventListener('popstate', update); return () => window.removeEventListener('popstate', update) }, [])
+
+  const handleAuthenticated = user => {
+    const destination = getLandingPath(user)
+    if (!user.roles.length) return 'Your account is authenticated, but no authorized workspace has been assigned. Contact your administrator.'
+    if (user.roles.length === 1) { persistSession({ user, workspace: user.roles[0] }) }
+    setSession(readSession())
+    navigate(destination)
+    return ''
+  }
+  const handleLogout = () => { clearSession(); setSession(null); navigate('/login') }
+
+  if (path === '/') return <Welcome />
+  if (path === '/login') return <Login onAuthenticated={handleAuthenticated} />
+  if (path === '/request-access') return <RequestAccess />
+  if (path === '/workspace') {
+    if (!session?.user?.roles?.length) { navigate('/login'); return null }
+    if (session.user.roles.length === 1) { navigate('/dashboard'); return null }
+    return <Workspace user={session.user} onSelected={() => { setSession(readSession()); navigate('/dashboard') }} />
+  }
+  if (path === '/dashboard') {
+    if (!session?.user || !session.workspace || !session.user.roles.some(role => role.id === session.workspace.id)) { navigate(session?.user?.roles?.length > 1 ? '/workspace' : '/login'); return null }
+    return <div className="dashboard-shell"><Dashboard onLogout={handleLogout} /></div>
+  }
+  navigate('/')
+  return null
 }
 
 createRoot(document.getElementById('root')).render(<App />)

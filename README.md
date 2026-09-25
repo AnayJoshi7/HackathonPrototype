@@ -117,3 +117,15 @@ This feature adds a lightweight monitoring workflow for demonstrating how a land
 A real data-source integration can later swap the local images for Sentinel-2 or Bhuvan raster tiles without changing the monitoring workflow itself.
 
 The frontend uses Esri World Imagery tiles, Leaflet, Lucide icons, and a deterministic local fallback dataset so the map remains explorable while the API is starting.
+
+## Authentication prototype
+
+The frontend now starts at the N-LAMS welcome screen and protects the existing dashboard behind Login and Authorized Workspace screens. Authentication is isolated in `frontend/src/auth.js` so the mock adapter can be replaced by the government identity API without changing the UI.
+
+Demo identities:
+
+- `revenue@nic.in` with any non-empty password: all four demo workspaces
+- `legal@nic.in` with any non-empty password: single Legal Officer workspace, which bypasses selection
+- `pending@nic.in` with any non-empty password: authenticated user with no authorized workspace
+
+The Request Access adapter submits official profile fields only; it never accepts a requested role. Forgot Password is currently an explicit recovery integration stub and reports that the government identity provider is not connected.

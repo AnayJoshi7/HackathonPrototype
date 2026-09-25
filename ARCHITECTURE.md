@@ -1,10 +1,6 @@
-# N-LAMS Prototype: Simple Technical Explanation
-
-## 1. What the prototype does
-
 N-LAMS demonstrates this flow:
 
-```text
+
 User draws a road corridor
         ↓
 The API checks which cadastral parcels intersect it
@@ -14,13 +10,13 @@ The system clips those parcels and calculates compensation
 The UI shows landholders, values, and affected areas
         ↓
 Simulated government checks and an audit hash are available
-```
+
 
 The prototype is intentionally small. It proves the main workflow without requiring real government credentials, real payment access, or a production survey-data pipeline.
 
-## 2. Repository structure
+Repo structure
 
-```text
+
 N-LAMS/
 ├── docker-compose.yml          Starts PostGIS and the FastAPI API
 ├── README.md                   Setup and run instructions
@@ -51,13 +47,13 @@ N-LAMS/
         └── styles.css            Operational console styling
 ```
 
-## 3. Technology choices
+Tech
 
-### Docker Compose
+#Docker Compose
 
 Docker Compose runs the database and API in repeatable containers. This means another computer does not need a manually configured Python environment or PostGIS installation.
 
-### PostgreSQL + PostGIS
+#PostgreSQL + PostGIS
 
 PostgreSQL stores parcel attributes. PostGIS adds spatial types and functions, which are necessary for questions such as “which parcels intersect this corridor?” A normal SQL database would make this much harder and less reliable.
 
@@ -71,21 +67,21 @@ The database service is:
 
 The host port is `5433` to avoid conflicts with a local PostgreSQL server. Docker services still use the internal address `db:5432`.
 
-### FastAPI
+#FastAPI
 
 FastAPI provides small, typed HTTP endpoints and automatically generates `/docs`. It was chosen because it is quick to build, easy to demonstrate, and works naturally with Python GIS and computer-vision libraries.
 
-### SQLAlchemy and GeoAlchemy2
+#SQLAlchemy and GeoAlchemy2
 
 SQLAlchemy maps Python classes to database tables. GeoAlchemy2 adds PostGIS geometry support. The `Parcel` model contains normal fields such as `owner_name` and `circle_rate`, plus a WGS84 polygon geometry.
 
-### Pydantic schemas
+#Pydantic schemas
 
 Pydantic validates API requests before business logic runs. For example, a corridor must contain at least two coordinates and its width must be positive. This keeps invalid demo requests from reaching the spatial query.
 
-## 4. Database model
+#Database model
 
-### `parcels`
+#`parcels`
 
 Each parcel contains:
 
@@ -97,7 +93,7 @@ Each parcel contains:
 - `district`: demo district, Pune
 - `geometry`: PostGIS polygon in EPSG:4326 / WGS84
 
-### `ledger_entries`
+#`ledger_entries`
 
 Each audit entry contains:
 
@@ -109,13 +105,13 @@ Each audit entry contains:
 
 The previous hash links every entry to the one before it. Changing an old entry would break the chain from that point onward. This is a simulated tamper-evident ledger, not a blockchain network.
 
-## 5. Seed data
+#Seed data
 
 `backend/seed_data.py` creates 18 parcels in a 6-by-3 grid. Each polygon is contiguous with its neighbours and receives realistic demo attributes. Shapely creates the polygons, while GeoAlchemy2 converts them to PostGIS-compatible WKT.
 
 The seed script first clears old parcels and ledger entries. This makes repeated demo resets predictable. It then writes a `SEED_DATASET_CREATED` ledger entry.
 
-## 6. GIS workflow
+#GIS workflow
 
 The main endpoint is `POST /api/gis/corridor`.
 
@@ -131,15 +127,13 @@ The main endpoint is `POST /api/gis/corridor`.
 
 The current demo uses a degree-based buffer approximation for speed and simplicity. A production system should transform geometries into a local projected CRS, use survey-grade source data, and apply a legally approved acquisition boundary.
 
-## 7. Compensation workflow
+#Compensation workflow
 
 The prototype calculation is in `backend/app/services/compensation.py`:
 
-```text
 multiplied value = market value × rural multiplier
 solatium = multiplied value × solatium rate
 total = multiplied value + solatium + assets + rehabilitation allowance
-```
 
 The default demo values are:
 
@@ -150,7 +144,7 @@ The default demo values are:
 
 This is a simplified RFCTLARR-style demonstration. Actual awards depend on location, notification date, land category, assets, rehabilitation rules, statutory authorities, and current government notifications. The prototype must not be treated as a legal award calculator.
 
-## 8. Simulated government integrations
+#Simulated government integrations
 
 `GET /api/compensation/integrations` returns fixed demo statuses:
 
@@ -160,7 +154,7 @@ This is a simplified RFCTLARR-style demonstration. Actual awards depend on locat
 
 These are intentionally stubs. There are no real credentials, external calls, or payments. In a production system, each would be placed behind an adapter with authentication, retries, consent, audit logging, and reconciliation.
 
-## 9. Computer vision monitoring
+#Computer vision monitoring
 
 `POST /api/monitor/change-detection` accepts two uploaded images:
 
@@ -174,7 +168,7 @@ These are intentionally stubs. There are no real credentials, external calls, or
 
 This proves the endpoint and processing pipeline. A production monitoring service would also need image registration, cloud masking, orthorectification, seasonal normalization, confidence scoring, and polygon output for detected encroachments.
 
-## 10. Audit ledger
+#Audit ledger
 
 When an entry is appended, the service:
 
@@ -186,7 +180,7 @@ When an entry is appended, the service:
 
 This gives the demo an easy-to-understand integrity trail. It provides tamper evidence, not independent consensus or legal non-repudiation.
 
-## 11. Frontend implementation
+#Frontend implementation
 
 The frontend is a React 18 application built with Vite.
 
@@ -202,7 +196,7 @@ The frontend is a React 18 application built with Vite.
 
 The UI includes a local fallback dataset. This is useful during a presentation because the map and inspector still render if the API is temporarily unavailable. Once the API responds, the frontend replaces the fallback parcels with database data.
 
-## 12. End-to-end demo sequence
+#End-to-end demo sequence
 
 1. Start Docker and the two Compose services.
 2. Seed the database.
@@ -215,7 +209,7 @@ The UI includes a local fallback dataset. This is useful during a presentation b
 9. The UI highlights affected parcels and updates the liability estimate.
 10. Use `/docs` to demonstrate compensation, monitoring, integration, and ledger endpoints.
 
-## 13. Prototype limitations and next production steps
+#Prototype limitations and next production steps
 
 - Replace generated polygons with authoritative cadastral data.
 - Use a projected CRS and geodesic/engineering corridor widths.
