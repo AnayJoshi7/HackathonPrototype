@@ -1,7 +1,7 @@
 import React from 'react'
 import { createRoot } from 'react-dom/client'
 import { GeoJSON, MapContainer, Polyline, TileLayer, useMapEvents } from 'react-leaflet'
-import { ArrowRight, ArrowUpRight, BadgeCheck, CheckCircle2, Database, Eye, EyeOff, FileCheck2, Layers3, LockKeyhole, Route, ShieldCheck, Sparkles, WalletCards } from 'lucide-react'
+import { ArrowRight, ArrowUpRight, BadgeCheck, CheckCircle2, Database, Eye, EyeOff, FileCheck2, Layers3, LockKeyhole, Moon, Route, ShieldCheck, Sparkles, Sun, WalletCards } from 'lucide-react'
 import { authenticate, clearSession, getLandingPath, persistSession, readSession, setWorkspace, submitAccessRequest, validateAccessRequest } from './auth'
 import 'leaflet/dist/leaflet.css'
 import './styles.css'
@@ -69,7 +69,19 @@ function MapClick({ onPoint }) {
   return null
 }
 
-function Dashboard({ onLogout }) {
+function ThemeToggle({ theme, onToggleTheme }) {
+  const Icon = theme === 'dark' ? Sun : Moon
+  return <button className="theme-toggle" type="button" onClick={onToggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}>
+    <Icon size={16} />
+    <span>{theme === 'dark' ? 'Dark' : 'Light'} mode</span>
+  </button>
+}
+
+function SystemFooter({ className = 'auth-footer' }) {
+  return <footer className={className}><span>OFFICIAL USE ONLY • MINISTRY OF ROAD TRANSPORT &amp; HIGHWAYS • GOVT OF INDIA</span><div><span>Security Policy</span><span>System Support</span><span>Privacy Protocol</span></div></footer>
+}
+
+function Dashboard({ onLogout, theme, onToggleTheme }) {
   const [parcels, setParcels] = React.useState(fallbackParcels)
   const [selected, setSelected] = React.useState(fallbackParcels[7])
   const [corridor, setCorridor] = React.useState([])
@@ -116,7 +128,7 @@ function Dashboard({ onLogout }) {
     <main>
       <header className="topbar">
         <div className="brand"><strong>N-LAMS</strong><span>National Land Acquisition &amp; Management System</span></div>
-        <div className="top-actions"><span className="live"><i /> System Online</span><button className="session-logout" onClick={onLogout}>Sign out</button><div className="avatar" aria-label="User profile">AM</div></div>
+        <div className="top-actions"><span className="live"><i /> System Online</span><ThemeToggle theme={theme} onToggleTheme={onToggleTheme} /><button className="session-logout" onClick={onLogout}>Sign out</button><div className="avatar" aria-label="User profile">AM</div></div>
       </header>
 
       <section className="workspace-head">
@@ -135,8 +147,8 @@ function Dashboard({ onLogout }) {
           <MapContainer center={[18.523, 73.785]} zoom={14} zoomControl={false} className="map">
             <TileLayer attribution="Tiles © Esri" url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" />
             <MapClick onPoint={point => setCorridor(points => [...points, point])} />
-            {parcels.map(parcel => <GeoJSON key={parcel.id} data={parcel.geometry} eventHandlers={{ click: () => setSelected(parcel) }} pathOptions={{ color: selected?.id === parcel.id ? '#3DDC84' : '#FFFFFF', weight: selected?.id === parcel.id ? 3 : 1, fillColor: affected.some(item => item.khasra_no === parcel.khasra_no) ? '#3DDC84' : '#FFFFFF', fillOpacity: selected?.id === parcel.id ? 0.5 : 0.2 }} />)}
-            {corridor.length > 1 && <Polyline positions={corridor.map(([longitude, latitude]) => [latitude, longitude])} color="#3DDC84" weight={5} dashArray="8 8" />}
+            {parcels.map(parcel => <GeoJSON key={parcel.id} data={parcel.geometry} eventHandlers={{ click: () => setSelected(parcel) }} pathOptions={{ color: selected?.id === parcel.id ? (theme === 'dark' ? '#FFFFFF' : '#174F86') : '#FFFFFF', weight: selected?.id === parcel.id ? 3 : 1, fillColor: affected.some(item => item.khasra_no === parcel.khasra_no) || selected?.id === parcel.id ? (theme === 'dark' ? '#526174' : '#174F86') : '#FFFFFF', fillOpacity: selected?.id === parcel.id ? 0.7 : 0.2 }} />)}
+            {corridor.length > 1 && <Polyline positions={corridor.map(([longitude, latitude]) => [latitude, longitude])} color="#174F86" weight={5} dashArray="8 8" />}
           </MapContainer>
           <div className="map-legend"><span><i className="legend-parcel" /> Cadastral boundary</span><span><i className="legend-corridor" /> Proposed alignment</span><span><i className="legend-affected" /> Affected parcel</span></div>
           <div className="map-status">{status}<span>18 / 18 synced</span></div>
@@ -177,6 +189,7 @@ function Dashboard({ onLogout }) {
           <button className="secondary"><ShieldCheck size={16} /> VIEW FULL PARCEL RECORD</button>
         </aside>
       </section>
+      <SystemFooter className="dashboard-footer" />
     </main>
   )
 }
@@ -186,19 +199,19 @@ function navigate(path) {
   window.dispatchEvent(new PopStateEvent('popstate'))
 }
 
-function AuthShell({ children, footer = true }) {
-  return <div className="auth-shell">
+function AuthShell({ children, footer = true, theme, onToggleTheme, welcome = false }) {
+  return <div className={`auth-shell ${welcome ? 'welcome-shell' : ''}`}>
     <header className="auth-header">
       <button className="auth-brand" onClick={() => navigate('/')} aria-label="Go to N-LAMS welcome screen"><strong>N-LAMS</strong><span>National Land Acquisition &amp; Management System</span></button>
-      <div className="secure-connection"><i /> SECURE CONNECTION</div>
+      <div className="auth-header-actions"><ThemeToggle theme={theme} onToggleTheme={onToggleTheme} /><div className="secure-connection"><i /> SECURE CONNECTION</div></div>
     </header>
-    <main className="auth-main">{children}</main>
-    {footer && <footer className="auth-footer"><span>OFFICIAL USE ONLY • MINISTRY OF ROAD TRANSPORT &amp; HIGHWAYS • GOVT OF INDIA</span><div><span>Security Policy</span><span>System Support</span><span>Privacy Protocol</span></div></footer>}
+    <main className={`auth-main ${welcome ? 'welcome-main' : ''}`}>{children}</main>
+    {footer && <SystemFooter />}
   </div>
 }
 
-function Welcome() {
-  return <AuthShell>
+function Welcome({ theme, onToggleTheme }) {
+  return <AuthShell theme={theme} onToggleTheme={onToggleTheme} welcome>
     <section className="welcome-content">
       <div className="welcome-intro"><h1>One workspace for every stage of land acquisition.</h1><p>Map affected land, review land history, manage acquisition workflows and monitor changes from a single workspace.</p></div>
       <div className="capability-grid">
@@ -212,7 +225,7 @@ function Welcome() {
   </AuthShell>
 }
 
-function Login({ onAuthenticated }) {
+function Login({ onAuthenticated, theme, onToggleTheme }) {
   const [credentials, setCredentials] = React.useState({ email: '', password: '' })
   const [showPassword, setShowPassword] = React.useState(false)
   const [status, setStatus] = React.useState({ error: '', loading: false })
@@ -231,7 +244,7 @@ function Login({ onAuthenticated }) {
     }
   }
 
-  return <AuthShell><section className="auth-card login-card"><div className="auth-card-header"><h1>Sign in to N-LAMS</h1><p><LockKeyhole size={16} /> Secure Government Workspace</p></div><form onSubmit={submit}>
+  return <AuthShell theme={theme} onToggleTheme={onToggleTheme}><section className="auth-card login-card"><div className="auth-card-header"><h1>Sign in to N-LAMS</h1><p><LockKeyhole size={16} /> Secure Government Workspace</p></div><form onSubmit={submit}>
     <label>Official Email / User ID<input type="email" value={credentials.email} onChange={event => setCredentials({ ...credentials, email: event.target.value })} placeholder="e.g., s.more@nic.in" autoComplete="username" required /></label>
     <label>Password<div className="password-input"><input type={showPassword ? 'text' : 'password'} value={credentials.password} onChange={event => setCredentials({ ...credentials, password: event.target.value })} placeholder="••••••••••••" autoComplete="current-password" required /><button type="button" onClick={() => setShowPassword(value => !value)} aria-label={showPassword ? 'Hide password' : 'Show password'}>{showPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button></div></label>
     {status.error && <p className="form-error" role="alert">{status.error}</p>}
@@ -240,7 +253,7 @@ function Login({ onAuthenticated }) {
   </form></section></AuthShell>
 }
 
-function RequestAccess() {
+function RequestAccess({ theme, onToggleTheme }) {
   const [details, setDetails] = React.useState({ fullName: '', email: '', employeeId: '', department: '', designation: '', authority: '' })
   const [status, setStatus] = React.useState({ error: '', success: '', loading: false })
   const fields = [['fullName', 'Full Name', 'e.g., Sanjay More'], ['email', 'Official Email', 'e.g., s.more@nic.in'], ['employeeId', 'Employee / Officer ID', 'e.g., SG-1094-MO'], ['department', 'Department', 'e.g., Revenue Department'], ['designation', 'Designation', 'e.g., Revenue Officer'], ['authority', 'District / Authority', 'e.g., Pune / NHAI-MH']]
@@ -252,17 +265,19 @@ function RequestAccess() {
     await submitAccessRequest(details)
     setStatus({ error: '', success: 'Request submitted. An authorized administrator will review your official details.', loading: false })
   }
-  return <AuthShell><section className="auth-card request-card"><div className="auth-card-header"><h1>Request Access</h1><p>Submit your official details to request workspace credentials. Access is restricted to verified government authorities and revenue officials.</p></div><form onSubmit={submit}><div className="request-grid">{fields.map(([name, label, placeholder]) => <label key={name}>{label}<input type={name === 'email' ? 'email' : 'text'} value={details[name]} onChange={event => setDetails({ ...details, [name]: event.target.value })} placeholder={placeholder} required /></label>)}</div>{status.error && <p className="form-error" role="alert">{status.error}</p>}{status.success && <p className="form-success" role="status">{status.success}</p>}<p className="access-note">Access is subject to authorization by the relevant administrator.</p><button className="auth-button compact" type="submit" disabled={status.loading}>{status.loading ? 'Submitting…' : 'Submit Access Request →'}</button></form></section></AuthShell>
+  return <AuthShell theme={theme} onToggleTheme={onToggleTheme}><section className="auth-card request-card"><div className="auth-card-header"><h1>Request Access</h1><p>Submit your official details to request workspace credentials. Access is restricted to verified government authorities and revenue officials.</p></div><form onSubmit={submit}><div className="request-grid">{fields.map(([name, label, placeholder]) => <label key={name}>{label}<input type={name === 'email' ? 'email' : 'text'} value={details[name]} onChange={event => setDetails({ ...details, [name]: event.target.value })} placeholder={placeholder} required /></label>)}</div>{status.error && <p className="form-error" role="alert">{status.error}</p>}{status.success && <p className="form-success" role="status">{status.success}</p>}<p className="access-note">Access is subject to authorization by the relevant administrator.</p><button className="auth-button compact" type="submit" disabled={status.loading}>{status.loading ? 'Submitting…' : 'Submit Access Request →'}</button></form></section></AuthShell>
 }
 
-function Workspace({ user, onSelected }) {
+function Workspace({ user, onSelected, theme, onToggleTheme }) {
   const [selected, setSelected] = React.useState(user.roles[0])
-  return <AuthShell footer={false}><section className="workspace-select"><div className="workspace-intro"><h1>Select your workspace</h1><p>Choose an authorized workspace to continue.</p></div><div className="role-grid">{user.roles.map(role => <button key={role.id} className={`role-card ${selected.id === role.id ? 'active' : ''}`} onClick={() => setSelected(role)}><strong>{role.label}</strong><span>{role.description}</span></button>)}</div><div className="workspace-action"><button className="auth-button compact" onClick={() => { setWorkspace(selected); onSelected() }}>Enter Workspace <ArrowRight size={16} /></button><ShieldCheck size={14} /></div></section></AuthShell>
+  return <AuthShell footer={false} theme={theme} onToggleTheme={onToggleTheme}><section className="workspace-select"><div className="workspace-intro"><h1>Select your workspace</h1><p>Choose an authorized workspace to continue.</p></div><div className="role-grid">{user.roles.map(role => <button key={role.id} className={`role-card ${selected.id === role.id ? 'active' : ''}`} onClick={() => setSelected(role)}><strong>{role.label}</strong><span>{role.description}</span></button>)}</div><div className="workspace-action"><button className="auth-button compact" onClick={() => { setWorkspace(selected); onSelected() }}>Enter Workspace <ArrowRight size={16} /></button><ShieldCheck size={14} /></div></section></AuthShell>
 }
 
 function App() {
   const [path, setPath] = React.useState(window.location.pathname)
   const [session, setSession] = React.useState(readSession)
+  const [theme, setTheme] = React.useState('light')
+  const onToggleTheme = () => setTheme(current => current === 'light' ? 'dark' : 'light')
   React.useEffect(() => { const update = () => setPath(window.location.pathname); window.addEventListener('popstate', update); return () => window.removeEventListener('popstate', update) }, [])
 
   const handleAuthenticated = user => {
@@ -275,17 +290,17 @@ function App() {
   }
   const handleLogout = () => { clearSession(); setSession(null); navigate('/login') }
 
-  if (path === '/') return <Welcome />
-  if (path === '/login') return <Login onAuthenticated={handleAuthenticated} />
-  if (path === '/request-access') return <RequestAccess />
+  if (path === '/') return <div className="app-shell" data-theme={theme}><Welcome theme={theme} onToggleTheme={onToggleTheme} /></div>
+  if (path === '/login') return <div className="app-shell" data-theme={theme}><Login onAuthenticated={handleAuthenticated} theme={theme} onToggleTheme={onToggleTheme} /></div>
+  if (path === '/request-access') return <div className="app-shell" data-theme={theme}><RequestAccess theme={theme} onToggleTheme={onToggleTheme} /></div>
   if (path === '/workspace') {
     if (!session?.user?.roles?.length) { navigate('/login'); return null }
     if (session.user.roles.length === 1) { navigate('/dashboard'); return null }
-    return <Workspace user={session.user} onSelected={() => { setSession(readSession()); navigate('/dashboard') }} />
+    return <div className="app-shell" data-theme={theme}><Workspace user={session.user} onSelected={() => { setSession(readSession()); navigate('/dashboard') }} theme={theme} onToggleTheme={onToggleTheme} /></div>
   }
   if (path === '/dashboard') {
     if (!session?.user || !session.workspace || !session.user.roles.some(role => role.id === session.workspace.id)) { navigate(session?.user?.roles?.length > 1 ? '/workspace' : '/login'); return null }
-    return <div className="dashboard-shell"><Dashboard onLogout={handleLogout} /></div>
+    return <div className="app-shell" data-theme={theme}><div className="dashboard-shell"><Dashboard onLogout={handleLogout} theme={theme} onToggleTheme={onToggleTheme} /></div></div>
   }
   navigate('/')
   return null
